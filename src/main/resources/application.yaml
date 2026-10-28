@@ -39,3 +39,12 @@ scheduler:
   enabled: ${SCHEDULER_ENABLED:true}
   fixed-delay: ${SCHEDULER_FIXED_DELAY:5s}
   batch-size: ${SCHEDULER_BATCH_SIZE:20}
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db

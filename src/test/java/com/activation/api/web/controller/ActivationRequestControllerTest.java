@@ -1,5 +1,6 @@
 package com.activation.api.web.controller;
 
+import com.activation.api.TestcontainersConfiguration;
 import com.activation.api.domain.model.ActivationStatus;
 import com.activation.api.infra.persistence.ActivationRequestEntity;
 import com.activation.api.infra.persistence.ActivationRequestJpaRepository;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -19,7 +21,14 @@ import org.springframework.test.web.servlet.ResultActions;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
@@ -33,6 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = "scheduler.enabled=false")
 @AutoConfigureMockMvc
+@Import(TestcontainersConfiguration.class)
 class ActivationRequestControllerTest {
 
     private static final String UTC_ISO_8601 = "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z";
@@ -86,6 +96,31 @@ class ActivationRequestControllerTest {
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.detail").value("Activation request already exists for externalId: ORD-2026-000123"));
 
+            assertThat(jpaRepository.count()).isEqualTo(1);
+        }
+
+        @Test
+        void createsOnlyOneRequestForConcurrentDuplicates() throws Exception {
+            int threads = 10;
+            ExecutorService executor = Executors.newFixedThreadPool(threads);
+            CountDownLatch start = new CountDownLatch(1);
+            List<Future<Integer>> statuses = new ArrayList<>();
+            for (int i = 0; i < threads; i++) {
+                statuses.add(executor.submit(() -> {
+                    start.await();
+                    return create("valid.json").andReturn().getResponse().getStatus();
+                }));
+            }
+
+            start.countDown();
+            List<Integer> results = new ArrayList<>();
+            for (Future<Integer> status : statuses) {
+                results.add(status.get(30, TimeUnit.SECONDS));
+            }
+            executor.shutdown();
+
+            assertThat(results).filteredOn(status -> status == 201).hasSize(1);
+            assertThat(results).filteredOn(status -> status == 409).hasSize(threads - 1);
             assertThat(jpaRepository.count()).isEqualTo(1);
         }
 
