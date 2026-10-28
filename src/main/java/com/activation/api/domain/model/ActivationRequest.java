@@ -1,5 +1,7 @@
 package com.activation.api.domain.model;
 
+import com.activation.api.domain.exception.InvalidStatusTransitionException;
+
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Objects;
@@ -59,6 +61,33 @@ public class ActivationRequest {
                 Objects.requireNonNull(status, "status"),
                 Objects.requireNonNull(createdAt, "createdAt"),
                 Objects.requireNonNull(updatedAt, "updatedAt")
+        );
+    }
+
+    public ActivationRequest startProcessing() {
+        return moveTo(ActivationStatus.PROCESSING);
+    }
+
+    public ActivationRequest complete() {
+        return moveTo(ActivationStatus.COMPLETED);
+    }
+
+    public ActivationRequest fail() {
+        return moveTo(ActivationStatus.FAILED);
+    }
+
+    private ActivationRequest moveTo(ActivationStatus next) {
+        if (!status.canTransitionTo(next)) {
+            throw new InvalidStatusTransitionException(id, status, next);
+        }
+        return new ActivationRequest(
+                id,
+                externalId,
+                customerId,
+                productCode,
+                next,
+                createdAt,
+                Instant.now().truncatedTo(ChronoUnit.SECONDS)
         );
     }
 

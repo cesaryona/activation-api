@@ -1,0 +1,13 @@
+{
+  "priority": 10,
+  "request": {
+    "method": "POST",
+    "url": "/provider/v1/activate",
+    "headers": {
+      "Idempotency-Key": { "matches": ".+" }
+    }
+  },
+  "response": {
+    "status": 200
+  }
+}

@@ -7,12 +7,14 @@ import com.activation.api.domain.model.ActivationRequest;
 import com.activation.api.domain.model.ActivationStatus;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -66,5 +68,12 @@ public class ActivationRequestRepositoryAdapter implements ActivationRequestRepo
                 result.getTotalElements(),
                 result.getTotalPages()
         );
+    }
+
+    @Override
+    public List<ActivationRequest> findPending(int limit) {
+        return jpaRepository.findByStatusOrderByCreatedAtAsc(ActivationStatus.PENDING, Limit.of(limit)).stream()
+                .map(ActivationRequestEntityMapper::toDomain)
+                .toList();
     }
 }
